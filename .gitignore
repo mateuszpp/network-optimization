@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Środowiska wirtualne (jeśli używasz)
+venv/
+env/
+
+# Konfiguracje edytorów (opcjonalnie)
+.vscode/
+.idea/
