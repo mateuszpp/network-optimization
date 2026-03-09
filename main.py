@@ -70,7 +70,7 @@ if __name__ == "__main__":
         
     #print(f"Wczytano pomyślnie Łącza: {len(network.links)}, Zapotrzebowania: {len(network.demands)}, M: {network.module_capacity}")
     
-    N_param, K_param, p_param, q_param, generations = 20, 10, 0.1, 0.1, 1000
+    N_param, K_param, p_param, q_param, generations = 20, 10, 0.1, 0.1, 200
     print(f"\nUruchamianie EA dla {problem_type} (N={N_param}, K={K_param}, p={p_param}, q={q_param})")
     
     best_solution = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param, max_generations=generations)
