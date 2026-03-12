@@ -3,6 +3,7 @@ import math
 import argparse
 from parser import parse_network_file
 from ea import run_ea
+import matplotlib.pyplot as plt
 
 def print_detailed_results(best_chromosome, network, problem_type):
     print(f" Wyniki i obliczenia ({problem_type})")
@@ -67,12 +68,20 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print(f"Błąd: Nie znaleziono pliku {filepath}")
         sys.exit(1)
-        
-    #print(f"Wczytano pomyślnie Łącza: {len(network.links)}, Zapotrzebowania: {len(network.demands)}, M: {network.module_capacity}")
     
     N_param, K_param, p_param, q_param, generations = 20, 10, 0.1, 0.1, 200
     print(f"\nUruchamianie EA dla {problem_type} (N={N_param}, K={K_param}, p={p_param}, q={q_param})")
     
-    best_solution = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param, max_generations=generations)
+    best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param, max_generations=generations)
     
     print_detailed_results(best_solution, network, problem_type)
+
+    # Rysowanie trajektorii (Uwaga 1)
+    print("\nGenerowanie wykresu trajektorii...")
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(len(trajectory)), trajectory, marker='o', linestyle='-', color='b')
+    plt.title(f'Trajektoria funkcji celu dla problemu {problem_type}')
+    plt.xlabel('Generacja')
+    plt.ylabel('Najlepsza wartość funkcji celu (Fitness)')
+    plt.grid(True)
+    plt.show() # To wyświetli okienko z wykresem

@@ -45,9 +45,16 @@ def run_ea(network, problem_type, N=20, K=10, p=0.1, q=0.1, max_generations=50):
     population = [generate_random_chromosome(network) for _ in range(N)]
     for chromo in population:
         chromo.evaluate(network, problem_type)
+    
+    # P(0) jest listą uporządkowaną
     population.sort(key=lambda x: x.fitness)
     
+    trajectory = [] # UWAGA 1: Lista do zapisywania trajektorii
+    
     for gen in range(max_generations):
+        # Zapisz najlepszy wynik w obecnej generacji
+        trajectory.append(population[0].fitness) 
+        
         O = []
         for _ in range(K):
             p1 = random.choice(population)
@@ -59,8 +66,16 @@ def run_ea(network, problem_type, N=20, K=10, p=0.1, q=0.1, max_generations=50):
             O[i] = mutate(O[i], network, p, q)
             O[i].evaluate(network, problem_type)
             
+        # UWAGA 3: Populacja O musi być listą uporządkowaną!
+        O.sort(key=lambda x: x.fitness) 
+            
+        # Sukcesja: P(n) = P(n-1) u O, a następnie wybór N najlepszych
         population.extend(O)
         population.sort(key=lambda x: x.fitness)
         population = population[:N] 
         
-    return population[0]
+    # Dodajemy wynik z ostatniej generacji
+    trajectory.append(population[0].fitness)
+        
+    # Zwracamy najlepszy chromosom oraz historię (trajektorię)
+    return population[0], trajectory

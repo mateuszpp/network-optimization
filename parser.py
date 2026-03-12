@@ -42,7 +42,7 @@ def parse_network_file(filepath):
             if len(parts) >= 4:
                 demands.append(Demand(parts[0], parts[1], parts[2], parts[3]))
                 
-        # ZMIANA TUTAJ: Bardziej elastyczny warunek wyłapujący ścieżki
+        
         elif line.startswith("set Demand") and "[" in line and ":=" in line:
             match = re.search(r'\[(\d+),(\d+)\]\s*:=\s*(.*?);', line)
             if match:
