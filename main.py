@@ -1,21 +1,22 @@
 import sys
 import math
 import argparse
+import numpy as np
 from parser import parse_network_file
 from ea import run_ea
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')  # Ustawienie backendu dla Matplotlib (dla lepszej kompatybilności z różnymi systemami)
 
 def print_detailed_results(best_chromosome, network, problem_type):
     print(f" Wyniki i obliczenia ({problem_type})")
-    
     print("\n[1] Zwycięski Chromosom (Przepływy ścieżkowe):")
     for d in network.demands:
         print(f"  Zapotrzebowanie d={d.id} (h={d.volume}): {best_chromosome.flows[d.id]}")
-        
+
     loads = best_chromosome.calculate_link_loads(network)
-    
     print(f"\n[2] Obliczenia obciążeń l(e,x) i funkcji celu F(x):")
-    
+
     if problem_type == 'DAP':
         max_overload = -float('inf')
         for link in network.links:
@@ -24,13 +25,10 @@ def print_detailed_results(best_chromosome, network, problem_type):
             o_e = l_e - c_e
             if o_e > max_overload:
                 max_overload = o_e
-            print(f"  Łącze e={link.id}:")
-            print(f"    - Obciążenie l(e,x) = {l_e}")
-            print(f"    - Pojemność  C(e)   = {c_e}")
-            print(f"    - Przeciążenie O(e) = {l_e} - {c_e} = {o_e}")
+            print(f"  Łącze e={link.id}: Obciążenie={l_e}, Pojemność={c_e}, Przeciążenie={o_e}")
         print("-" * 30)
         print(f"  MAX Przeciążenie: F(x) = {max_overload}")
-        
+
     elif problem_type == 'DDAP':
         total_cost = 0
         for link in network.links:
@@ -39,49 +37,75 @@ def print_detailed_results(best_chromosome, network, problem_type):
             y_e = math.ceil(l_e / network.module_capacity)
             cost_e = y_e * xi_e
             total_cost += cost_e
-            
-            print(f"  Łącze e={link.id}:")
-            print(f"    - Obciążenie l(e,x) = {l_e}")
-            print(f"    - Rozmiar modułu M  = {network.module_capacity}")
-            print(f"    - Liczba modułów y(e,x) = ceil({l_e}/{network.module_capacity}) = {y_e}")
-            print(f"    - Koszt modułu xi(e)= {xi_e}")
-            print(f"    - Koszt na łączu    = {y_e} * {xi_e} = {cost_e}")
+            print(f"  Łącze e={link.id}: Obciążenie={l_e}, Moduły={y_e}, Koszt={cost_e}")
         print("-" * 30)
         print(f"  CAŁKOWITY KOSZT: F(x) = {total_cost}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Algorytm Ewolucyjny dla problemów DAP/DDAP.")
-    
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-dap', action='store_true', help='Uruchom problem DAP')
     group.add_argument('-ddap', action='store_true', help='Uruchom problem DDAP')
-    
+
     parser.add_argument('-f', type=str, required=True, help='Ścieżka do pliku wejściowego (.txt)')
-    
+
+    parser.add_argument('--selection', type=str, choices=['random', 'tournament', 'rank'], default='random', help='Metoda doboru rodziców')
+    parser.add_argument('--mutation', type=str, choices=['swap', 'reroute'], default='swap', help='Metoda mutacji')
+    parser.add_argument('--compare', action='store_true', help='Uruchamia porównanie metod selekcji i generuje wspólny wykres')
+    parser.add_argument('--runs', type=int, default=30, help='Liczba uruchomień do uśrednienia w trybie compare')
+
     args = parser.parse_args()
     problem_type = 'DAP' if args.dap else 'DDAP'
     filepath = args.f
-    
-    print(f"Wczytywanie sieci z pliku: {filepath}")
+
     try:
         network = parse_network_file(filepath)
     except FileNotFoundError:
         print(f"Błąd: Nie znaleziono pliku {filepath}")
         sys.exit(1)
-    
-    N_param, K_param, p_param, q_param, generations = 20, 10, 0.1, 0.1, 200
-    print(f"\nUruchamianie EA dla {problem_type} (N={N_param}, K={K_param}, p={p_param}, q={q_param})")
-    
-    best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param, max_generations=generations)
-    
-    print_detailed_results(best_solution, network, problem_type)
 
-    # Rysowanie trajektorii (Uwaga 1)
-    print("\nGenerowanie wykresu trajektorii...")
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(len(trajectory)), trajectory, marker='o', linestyle='-', color='b')
-    plt.title(f'Trajektoria funkcji celu dla problemu {problem_type}')
-    plt.xlabel('Generacja')
-    plt.ylabel('Najlepsza wartość funkcji celu (Fitness)')
-    plt.grid(True)
-    plt.show() # To wyświetli okienko z wykresem
+    N_param, K_param, p_param, q_param, generations = 20, 10, 0.1, 0.1, 100
+
+    if args.compare:
+        print(f"\nUruchamianie trybu porównawczego dla {problem_type} na {generations} generacji (uśrednione z {args.runs} uruchomień)...")
+        plt.figure(figsize=(12, 7))
+        colors = {'random': 'gray', 'tournament': 'red', 'rank': 'blue'}
+
+        for sel in ['random', 'tournament', 'rank']:
+            print(f" -> Liczenie dla selekcji: {sel} ({args.runs} powtórzeń)...")
+            all_trajectories = []
+
+            # Pętla wykonująca algorytm określoną liczbę razy
+            for run_idx in range(args.runs):
+                _, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
+                                       max_generations=generations, sel_method=sel, mut_method='swap')
+                all_trajectories.append(trajectory)
+
+            # Obliczanie średniej wartości funkcji celu dla każdej generacji za pomocą numpy
+            avg_trajectory = np.mean(all_trajectories, axis=0)
+
+            plt.plot(range(len(avg_trajectory)), avg_trajectory, label=f'Selekcja: {sel} (średnia)', color=colors[sel], alpha=0.9, linewidth=2)
+
+        plt.title(f'Porównanie metod selekcji dla problemu {problem_type} (Średnia z {args.runs} uruchomień)')
+        plt.xlabel('Generacja')
+        plt.ylabel('Średnia wartość funkcji celu (Fitness)')
+        plt.legend()
+        plt.grid(True)
+        print("\nWygenerowano uśredniony wykres. Zamknij okno wykresu, aby zakończyć.")
+        plt.show()
+
+    else:
+        print(f"\nUruchamianie EA ({problem_type}) | Selekcja: {args.selection} | Mutacja: {args.mutation}")
+        best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
+                                           max_generations=generations, sel_method=args.selection, mut_method=args.mutation)
+
+        print_detailed_results(best_solution, network, problem_type)
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(len(trajectory)), trajectory, marker='o', linestyle='-', color='b')
+        plt.title(f'Trajektoria funkcji celu ({problem_type}, Sel: {args.selection}, Mut: {args.mutation})')
+        plt.xlabel('Generacja')
+        plt.ylabel('Najlepsza wartość funkcji celu (Fitness)')
+        plt.grid(True)
+        plt.show()
