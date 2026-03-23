@@ -65,7 +65,7 @@ if __name__ == "__main__":
         print(f"Błąd: Nie znaleziono pliku {filepath}")
         sys.exit(1)
 
-    N_param, K_param, p_param, q_param, generations = 20, 10, 0.1, 0.1, 100
+    N_param, K_param, p_param, q_param, generations = 50, 25, 0.1, 0.1, 5000
 
     if args.compare:
         print(f"\nUruchamianie trybu porównawczego dla {problem_type} na {generations} generacji (uśrednione z {args.runs} uruchomień)...")
