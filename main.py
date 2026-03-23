@@ -8,6 +8,25 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('TkAgg')  # Ustawienie backendu dla Matplotlib (dla lepszej kompatybilności z różnymi systemami)
 
+def print_parsed_network(network):
+    """
+    Funkcja pomocnicza wypisująca dane wczytane przez parser
+    w celu weryfikacji braku halucynacji (błędów wczytywania).
+    """
+    print("\n" + "="*50)
+    print(" WERYFIKACJA WCZYTANYCH DANYCH Z PLIKU")
+    print("="*50)
+    print(f"Rozmiar modułu pojemności (M) = {network.module_capacity}")
+    
+    print(f"\n--- Łącza (Links) [{len(network.links)}] ---")
+    for link in network.links:
+        print(f"  ID: {link.id:2} | Węzły: {link.nodeA:2} <-> {link.nodeZ:2} | C(e)/xi(e): {link.capacity}")
+        
+    print(f"\n--- Zapotrzebowania (Demands) [{len(network.demands)}] ---")
+    for d in network.demands:
+        print(f"  ID: {d.id:2} | Węzły: {d.nodeA:2} -> {d.nodeZ:2} | h(d): {d.volume:2} | Ścieżki: {d.paths}")
+    print("="*50 + "\n")
+
 def print_detailed_results(best_chromosome, network, problem_type):
     print(f" Wyniki i obliczenia ({problem_type})")
     print("\n[1] Zwycięski Chromosom (Przepływy ścieżkowe):")
@@ -61,6 +80,8 @@ if __name__ == "__main__":
 
     try:
         network = parse_network_file(filepath)
+        # WYPISANIE ZAWARTOŚCI PARSERA DO WERYFIKACJI
+        print_parsed_network(network)
     except FileNotFoundError:
         print(f"Błąd: Nie znaleziono pliku {filepath}")
         sys.exit(1)
@@ -68,24 +89,37 @@ if __name__ == "__main__":
     N_param, K_param, p_param, q_param, generations = 50, 25, 0.1, 0.1, 5000
 
     if args.compare:
-        print(f"\nUruchamianie trybu porównawczego dla {problem_type} na {generations} generacji (uśrednione z {args.runs} uruchomień)...")
+        print(f"Uruchamianie trybu porównawczego dla {problem_type} na {generations} generacji (uśrednione z {args.runs} uruchomień)...")
         plt.figure(figsize=(12, 7))
         colors = {'random': 'gray', 'tournament': 'red', 'rank': 'blue'}
 
         for sel in ['random', 'tournament', 'rank']:
-            print(f" -> Liczenie dla selekcji: {sel} ({args.runs} powtórzeń)...")
+            print(f"\n -> Liczenie dla selekcji: {sel} ({args.runs} powtórzeń)...")
             all_trajectories = []
+            final_results = [] # Lista do zbierania wyników końcowych z każdego uruchomienia
 
             # Pętla wykonująca algorytm określoną liczbę razy
             for run_idx in range(args.runs):
-                _, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
+                best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
                                        max_generations=generations, sel_method=sel, mut_method='swap')
                 all_trajectories.append(trajectory)
+                # Ostatni element trajektorii to najlepszy wynik z ostatniej generacji
+                final_results.append(trajectory[-1]) 
 
-            # Obliczanie średniej wartości funkcji celu dla każdej generacji za pomocą numpy
+            # Obliczanie statystyk
+            best_fitness = min(final_results)
+            worst_fitness = max(final_results)
+            mean_fitness = np.mean(final_results)
+            
+            # Wypisanie statystyk dla danej metody
+            print(f"    * Najlepszy wynik końcowy:  {best_fitness}")
+            print(f"    * Najgorszy wynik końcowy:  {worst_fitness}")
+            print(f"    * Średni wynik końcowy:     {mean_fitness:.2f}")
+
+            # Obliczanie średniej trajektorii do wykresu
             avg_trajectory = np.mean(all_trajectories, axis=0)
 
-            plt.plot(range(len(avg_trajectory)), avg_trajectory, label=f'Selekcja: {sel} (średnia)', color=colors[sel], alpha=0.9, linewidth=2)
+            plt.plot(range(len(avg_trajectory)), avg_trajectory, label=f'Selekcja: {sel} (średnia: {mean_fitness:.1f})', color=colors[sel], alpha=0.9, linewidth=2)
 
         plt.title(f'Porównanie metod selekcji dla problemu {problem_type} (Średnia z {args.runs} uruchomień)')
         plt.xlabel('Generacja')
@@ -96,7 +130,7 @@ if __name__ == "__main__":
         plt.show()
 
     else:
-        print(f"\nUruchamianie EA ({problem_type}) | Selekcja: {args.selection} | Mutacja: {args.mutation}")
+        print(f"Uruchamianie EA ({problem_type}) | Selekcja: {args.selection} | Mutacja: {args.mutation}")
         best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
                                            max_generations=generations, sel_method=args.selection, mut_method=args.mutation)
 
