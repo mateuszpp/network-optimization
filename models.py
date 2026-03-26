@@ -39,10 +39,19 @@ class Chromosome:
 
     def evaluate(self, network, problem_type):
         loads = self.calculate_link_loads(network)
+        # if problem_type == 'DAP':
+        #     max_overload = -float('inf')
+        #     for link in network.links:
+        #         overload = loads[link.id] - link.capacity
+        #         if overload > max_overload:
+        #             max_overload = overload
+        #     self.fitness = max_overload
         if problem_type == 'DAP':
             max_overload = -float('inf')
             for link in network.links:
-                overload = loads[link.id] - link.capacity
+                # RZECZYWISTA pojemność to liczba modułów * rozmiar modułu (M)
+                actual_capacity = link.capacity * network.module_capacity 
+                overload = loads[link.id] - actual_capacity
                 if overload > max_overload:
                     max_overload = overload
             self.fitness = max_overload

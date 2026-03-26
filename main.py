@@ -13,7 +13,7 @@ def print_parsed_network(network):
     Funkcja pomocnicza wypisująca dane wczytane przez parser
     w celu weryfikacji braku halucynacji (błędów wczytywania).
     """
-    print("\n" + "="*50)
+
     print(" WERYFIKACJA WCZYTANYCH DANYCH Z PLIKU")
     print("="*50)
     print(f"Rozmiar modułu pojemności (M) = {network.module_capacity}")
@@ -36,11 +36,24 @@ def print_detailed_results(best_chromosome, network, problem_type):
     loads = best_chromosome.calculate_link_loads(network)
     print(f"\n[2] Obliczenia obciążeń l(e,x) i funkcji celu F(x):")
 
+    # if problem_type == 'DAP':
+    #     max_overload = -float('inf')
+    #     for link in network.links:
+    #         l_e = loads[link.id]
+    #         c_e = link.capacity
+    #         o_e = l_e - c_e
+    #         if o_e > max_overload:
+    #             max_overload = o_e
+    #         print(f"  Łącze e={link.id}: Obciążenie={l_e}, Pojemność={c_e}, Przeciążenie={o_e}")
+    #     print("-" * 30)
+    #     print(f"  MAX Przeciążenie: F(x) = {max_overload}")
+
     if problem_type == 'DAP':
         max_overload = -float('inf')
         for link in network.links:
             l_e = loads[link.id]
-            c_e = link.capacity
+            # POPRAWKA: liczymy prawdziwą pojemność
+            c_e = link.capacity * network.module_capacity 
             o_e = l_e - c_e
             if o_e > max_overload:
                 max_overload = o_e
@@ -80,13 +93,13 @@ if __name__ == "__main__":
 
     try:
         network = parse_network_file(filepath)
-        # WYPISANIE ZAWARTOŚCI PARSERA DO WERYFIKACJI
+        # weryfikacja zawartości parsera 
         print_parsed_network(network)
     except FileNotFoundError:
         print(f"Błąd: Nie znaleziono pliku {filepath}")
         sys.exit(1)
 
-    N_param, K_param, p_param, q_param, generations = 50, 25, 0.1, 0.1, 5000
+    N_param, K_param, p_param, q_param, generations = 50, 25, 0.6, 0.6, 800
 
     if args.compare:
         print(f"Uruchamianie trybu porównawczego dla {problem_type} na {generations} generacji (uśrednione z {args.runs} uruchomień)...")

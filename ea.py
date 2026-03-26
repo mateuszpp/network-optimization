@@ -103,3 +103,6 @@ def run_ea(network, problem_type, N=20, K=10, p=0.1, q=0.1, max_generations=50, 
 
     trajectory.append(population[0].fitness)
     return population[0], trajectory
+
+
+# 10 100, wzór 
