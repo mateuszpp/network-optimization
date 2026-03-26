@@ -73,7 +73,7 @@ def mutate(chromosome, network, p, q, method="swap"):
 
     return Chromosome(mutated_flows)
 
-def run_ea(network, problem_type, N=20, K=10, p=0.1, q=0.1, max_generations=50, sel_method="random", mut_method="swap"):
+def run_ea(network, problem_type, N, K, p, q, max_generations, sel_method="random", mut_method="swap"):
     population = [generate_random_chromosome(network) for _ in range(N)]
     for chromo in population:
         chromo.evaluate(network, problem_type)
