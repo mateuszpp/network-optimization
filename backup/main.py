@@ -81,12 +81,11 @@ if __name__ == "__main__":
     group.add_argument('-ddap', action='store_true', help='Uruchom problem DDAP')
 
     parser.add_argument('-f', type=str, required=True, help='Ścieżka do pliku wejściowego (.txt)')
-    
-    # Stare argumenty
-    parser.add_argument('--selection', type=str, choices=['random', 'best_and_rank', 'rank_proportional'], default='random')
-    
-    # Nowa flaga do automatyzacji Raportu R-1
-    parser.add_argument('--raport1', action='store_true', help='Uruchamia automatyczny test 3 zestawów do Raportu R-1 (po 10 przebiegów)')
+
+    parser.add_argument('--selection', type=str, choices=['random', 'tournament', 'rank'], default='random', help='Metoda doboru rodziców')
+    parser.add_argument('--mutation', type=str, choices=['swap', 'reroute'], default='swap', help='Metoda mutacji')
+    parser.add_argument('--compare', action='store_true', help='Uruchamia porównanie metod selekcji i generuje wspólny wykres')
+    parser.add_argument('--runs', type=int, default=30, help='Liczba uruchomień do uśrednienia w trybie compare')
 
     args = parser.parse_args()
     problem_type = 'DAP' if args.dap else 'DDAP'
@@ -94,84 +93,66 @@ if __name__ == "__main__":
 
     try:
         network = parse_network_file(filepath)
+        # weryfikacja zawartości parsera 
+        print_parsed_network(network)
     except FileNotFoundError:
         print(f"Błąd: Nie znaleziono pliku {filepath}")
         sys.exit(1)
 
-    if args.raport1:
-        print("="*60)
-        print(f" URUCHAMIAM AUTOMATYZACJĘ DLA RAPORTU R-1 ({problem_type})")
-        print("="*60)
-        
-        # Definiujemy 4 zestawy badawcze
-        zestawy = [
-            {"nazwa": "Zestaw 1 (Losowa selekcja)", "N": 20, "K": 10, "p": 0.1, "q": 0.1, "sel": "random"},
-            {"nazwa": "Zestaw 2 (Najlepszy + Ranga)", "N": 20, "K": 10, "p": 0.1, "q": 0.3, "sel": "best_and_rank"},
-            {"nazwa": "Zestaw 3 (Ranga + Ranga, Duża Pop)", "N": 100, "K": 50, "p": 0.2, "q": 0.2, "sel": "rank_proportional"},
-            {"nazwa": "Zestaw 4 (Agresywna Mutacja)", "N": 100, "K": 50, "p": 0.2, "q": 0.5, "sel": "rank_proportional"}
-        ]
-        
-        runs = 10
-        max_gen = 500
-        
-        for i, config in enumerate(zestawy):
-            print(f"\n--- Badanie: {config['nazwa']} ---")
-            print(f"Parametry: N={config['N']}, K={config['K']}, p={config['p']}, q={config['q']}, Selekcja={config['sel']}")
+    N_param, K_param, p_param, q_param, generations = 50, 25, 0.7, 0.7, 1000
+
+    if args.compare:
+        print(f"Uruchamianie trybu porównawczego dla {problem_type} na {generations} generacji (uśrednione z {args.runs} uruchomień)...")
+        plt.figure(figsize=(12, 7))
+        colors = {'random': 'gray', 'tournament': 'red', 'rank': 'blue'}
+
+        for sel in ['random', 'tournament', 'rank']:
+            print(f"\n -> Liczenie dla selekcji: {sel} ({args.runs} powtórzeń)...")
+            all_trajectories = []
+            final_results = [] # Lista do zbierania wyników końcowych z każdego uruchomienia
+
+            # Pętla wykonująca algorytm określoną liczbę razy
+            for run_idx in range(args.runs):
+                best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
+                                       max_generations=generations, sel_method=sel, mut_method='swap')
+                all_trajectories.append(trajectory)
+                # Ostatni element trajektorii to najlepszy wynik z ostatniej generacji
+                final_results.append(trajectory[-1]) 
+
+            # Obliczanie statystyk
+            best_fitness = min(final_results)
+            worst_fitness = max(final_results)
+            mean_fitness = np.mean(final_results)
             
-            best_fitnesses = []
-            convergence_gens = []
-            trajectories_to_plot = []
-            
-            for run in range(runs):
-                best_solution, trajectory, conv_gen = run_ea(
-                    network, problem_type, 
-                    N=config['N'], K=config['K'], p=config['p'], q=config['q'],
-                    max_generations=max_gen, sel_method=config['sel'], mut_method='swap'
-                )
-                
-                best_fitnesses.append(trajectory[-1])
-                convergence_gens.append(conv_gen)
-                
-                # Zapisujemy pierwsze 3 trajektorie do narysowania na wykresie
-                if run < 3:
-                    trajectories_to_plot.append(trajectory)
-                    
-            avg_fitness = np.mean(best_fitnesses)
-            avg_conv_gen = np.mean(convergence_gens)
-            
-            print(f"Wyniki po 10 przebiegach:")
-            print(f" -> Uśredniona najlepsza funkcja celu: {avg_fitness:.2f}")
-            print(f" -> Uśredniona iteracja zbieżności:    {avg_conv_gen:.1f}")
-            
-            # TWORZENIE ODDZIELNEGO WYKRESU DLA OBECNEGO ZESTAWU
-            plt.figure(figsize=(8, 5))
-            for t_idx, traj in enumerate(trajectories_to_plot):
-                plt.plot(range(len(traj)), traj, label=f'Przebieg {t_idx+1}')
-            
-            plt.title(f"{config['nazwa']} ({problem_type})")
-            plt.xlabel('Generacja')
-            plt.ylabel('Wartość funkcji celu (Fitness)')
-            plt.grid(True)
-            plt.legend()
-            
-        print("\nWykresy zostały wygenerowane w osobnych oknach. Przepisz dane do tabel w Raporcie R-1!")
-        plt.show() # Ta komenda na samym końcu otworzy wszystkie 4 okienka naraz
+            # Wypisanie statystyk dla danej metody
+            print(f"    * Najlepszy wynik końcowy:  {best_fitness}")
+            print(f"    * Najgorszy wynik końcowy:  {worst_fitness}")
+            print(f"    * Średni wynik końcowy:     {mean_fitness:.2f}")
+
+            # Obliczanie średniej trajektorii do wykresu
+            avg_trajectory = np.mean(all_trajectories, axis=0)
+
+            plt.plot(range(len(avg_trajectory)), avg_trajectory, label=f'Selekcja: {sel} (średnia: {mean_fitness:.1f})', color=colors[sel], alpha=0.9, linewidth=2)
+
+        plt.title(f'Porównanie metod selekcji dla problemu {problem_type} (Średnia z {args.runs} uruchomień)')
+        plt.xlabel('Generacja')
+        plt.ylabel('Średnia wartość funkcji celu (Fitness)')
+        plt.legend()
+        plt.grid(True)
+        print("\nWygenerowano uśredniony wykres. Zamknij okno wykresu, aby zakończyć.")
+        plt.show()
 
     else:
-        # Standardowe, pojedyncze uruchomienie
-        print(f"Uruchamianie pojedynczego EA ({problem_type})")
-        best_solution, trajectory, conv_gen = run_ea(
-            network, problem_type, N=20, K=10, p=0.1, q=0.1,
-            max_generations=500, sel_method=args.selection, mut_method='swap'
-        )
+        print(f"Uruchamianie EA ({problem_type}) | Selekcja: {args.selection} | Mutacja: {args.mutation}")
+        best_solution, trajectory = run_ea(network, problem_type, N=N_param, K=K_param, p=p_param, q=q_param,
+                                           max_generations=generations, sel_method=args.selection, mut_method=args.mutation)
 
         print_detailed_results(best_solution, network, problem_type)
-        print(f"\nAlgorytm zbiegł się w {conv_gen}. generacji.")
 
         plt.figure(figsize=(10, 6))
-        plt.plot(range(len(trajectory)), trajectory, marker='', linestyle='-', color='b')
-        plt.title(f'Trajektoria funkcji celu ({problem_type}, Sel: {args.selection})')
+        plt.plot(range(len(trajectory)), trajectory, marker='o', linestyle='-', color='b')
+        plt.title(f'Trajektoria funkcji celu ({problem_type}, Sel: {args.selection}, Mut: {args.mutation})')
         plt.xlabel('Generacja')
-        plt.ylabel('Najlepsza wartość funkcji celu')
+        plt.ylabel('Najlepsza wartość funkcji celu (Fitness)')
         plt.grid(True)
         plt.show()

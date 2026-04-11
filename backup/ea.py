@@ -14,30 +14,26 @@ def generate_random_chromosome(network):
         flows[d.id] = gene
     return Chromosome(flows)
 
-def select_parents(population, method="random"):
-    """Wybór pary rodziców zgodnie z wytycznymi do raportu R-1."""
-    N = len(population)
-    
+def select_parents(population, method="random", tournament_size=3):
+    """Wybór pary rodziców na podstawie określonej metody."""
     if method == "random":
-        # Opcja (i): oba chromosomy wybierane losowo
         return random.choice(population), random.choice(population)
 
-    elif method == "best_and_rank":
-        # Opcja (ii): X najlepszy, Y z rozkładu p(n) (proporcjonalnie do rangi)
-        p1 = population[0] # Zakładamy, że populacja jest już posortowana
-        weights = [N - i for i in range(N)] # Wagi: N, N-1, ..., 1
-        p2 = random.choices(population, weights=weights, k=1)[0]
+    elif method == "tournament":
+        # Losujemy 'tournament_size' osobników i wybieramy z nich tego z najlepszym fitness
+        p1 = min(random.sample(population, min(tournament_size, len(population))), key=lambda x: x.fitness)
+        p2 = min(random.sample(population, min(tournament_size, len(population))), key=lambda x: x.fitness)
         return p1, p2
 
-    elif method == "rank_proportional":
-        # Opcja (iii): oba z rozkładu p(n) (proporcjonalnie do rangi)
-        weights = [N - i for i in range(N)]
-        p1 = random.choices(population, weights=weights, k=1)[0]
-        p2 = random.choices(population, weights=weights, k=1)[0]
+    elif method == "rank":
+        # Zakładamy, że populacja jest już posortowana (najlepszy na indeksie 0)
+        # Rangi: osobnik na indeksie 0 dostaje wagę N, na indeksie 1 wagę N-1, itd.
+        ranks = list(range(len(population), 0, -1))
+        p1 = random.choices(population, weights=ranks, k=1)[0]
+        p2 = random.choices(population, weights=ranks, k=1)[0]
         return p1, p2
 
 def crossover(parent1, parent2, network):
-    # (Bez zmian)
     offspring1_flows = {}
     offspring2_flows = {}
     for d in network.demands:
@@ -50,7 +46,6 @@ def crossover(parent1, parent2, network):
     return Chromosome(offspring1_flows), Chromosome(offspring2_flows)
 
 def mutate(chromosome, network, p, q, method="swap"):
-    # (Bez zmian, zostawiamy tylko swap zgodnie z instrukcją)
     if random.random() > p:
         return chromosome
     mutated_flows = copy.deepcopy(chromosome.flows)
@@ -58,37 +53,40 @@ def mutate(chromosome, network, p, q, method="swap"):
     for d in network.demands:
         if random.random() <= q:
             gene = mutated_flows[d.id]
+
             if method == "swap":
+                # Metoda z etapu 1: przeniesienie 1 jednostki ruchu
                 active_paths = [i for i, flow in enumerate(gene) if flow > 0]
                 if active_paths:
                     source_path = random.choice(active_paths)
                     target_path = random.randint(0, len(d.paths) - 1)
                     gene[source_path] -= 1
                     gene[target_path] += 1
+
+            elif method == "reroute":
+                # Nowa metoda: przydzielenie całego ruchu dla tego zapotrzebowania do 1 losowej ścieżki
+                total_flow = sum(gene)
+                new_gene = [0] * len(d.paths)
+                target_path = random.randint(0, len(d.paths) - 1)
+                new_gene[target_path] = total_flow
+                mutated_flows[d.id] = new_gene
+
     return Chromosome(mutated_flows)
 
-def run_ea(network, problem_type, N=20, K=10, p=0.1, q=0.1, max_generations=50, sel_method="random", mut_method="swap"):
+def run_ea(network, problem_type, N, K, p, q, max_generations, sel_method="random", mut_method="swap"):
     population = [generate_random_chromosome(network) for _ in range(N)]
     for chromo in population:
         chromo.evaluate(network, problem_type)
 
     population.sort(key=lambda x: x.fitness)
     trajectory = []
-    
-    best_overall_fitness = float('inf')
-    convergence_gen = 0 # Śledzenie iteracji, w której znaleziono najlepsze rozwiązanie
 
     for gen in range(max_generations):
-        current_best_fitness = population[0].fitness
-        trajectory.append(current_best_fitness)
-        
-        # Aktualizacja punktu zbieżności
-        if current_best_fitness < best_overall_fitness:
-            best_overall_fitness = current_best_fitness
-            convergence_gen = gen
+        trajectory.append(population[0].fitness)
 
         O = []
         for _ in range(K):
+            # Użycie nowej funkcji doboru rodziców
             p1, p2 = select_parents(population, method=sel_method)
             o1, o2 = crossover(p1, p2, network)
             O.extend([o1, o2])
@@ -104,6 +102,7 @@ def run_ea(network, problem_type, N=20, K=10, p=0.1, q=0.1, max_generations=50, 
         population = population[:N]
 
     trajectory.append(population[0].fitness)
-    
-    # Zwracamy dodatkowy parametr: iterację zbieżności
-    return population[0], trajectory, convergence_gen
+    return population[0], trajectory
+
+
+# 10 100, wzór 
