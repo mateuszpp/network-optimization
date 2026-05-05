@@ -1,0 +1,17 @@
+reset;
+
+model ddap.mod;
+data ddap2.txt;
+
+option solver "/home/student/Oast/Solvers/ampl.linux64/ampl.linux-intel64/cplex";
+
+
+solve;
+printf "Czas obliczeń solvera = %.3f s\n", _solve_time;
+
+display DDAP_obj;
+#display y;
+#display x;
+
+quit;
+reset;
