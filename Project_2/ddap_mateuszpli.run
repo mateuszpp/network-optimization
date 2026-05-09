@@ -1,0 +1,49 @@
+reset;
+
+model ddap.mod;
+data ddap2.txt;
+
+# Ścieżka do Twojego solvera (zostawiłem tę z Twojego pliku)
+option solver "/home/student/Oast/Solvers/ampl.linux64/ampl.linux-intel64/cplex";
+
+solve;
+
+printf "\n=========================================\n";
+printf "Czas obliczeń solvera = %.3f s\n", _solve_time;
+printf "=========================================\n\n";
+
+# --- 1. Wartość funkcji celu ---
+printf "[1] WARTOSC FUNKCJI CELU:\n";
+printf "Calkowity koszt modulow: %g\n\n", DDAP_obj;
+
+# --- 2. Statystyki Krawędzi ---
+printf "[2] SZCZEGOLY KRAWEDZI (Links):\n";
+printf "%-6s | %-12s | %-12s | %-12s | %-12s | %-12s\n",
+       "Link", "Obciazenie", "Pojemnosc", "Moduly (y)", "Koszt/Modul", "Koszt Calk.";
+printf "--------------------------------------------------------------------------------\n";
+
+for {l in Links} {
+    printf "%-6d | %-12d | %-12d | %-12d | %-12d | %-12d\n",
+        l,
+        # Sumujemy ruch ze wszystkich ścieżek przechodzących przez to łącze (Obciążenie)
+        sum {d in Demands, p in Paths[d] : l in Demand_pathLinks[d,p]} x[d,p],
+        # Wyliczona pojemność krawędzi
+        y[l] * moduleCapacity,
+        # Liczba modułów
+        y[l],
+        # Koszt pojedynczego modułu
+        link_moduleCost[l],
+        # Koszt całkowity na tym łączu
+        y[l] * link_moduleCost[l];
+}
+
+# --- 3. Przepływy Ścieżkowe ---
+printf "\n[3] PRZEPLYWY SCIEZKOWE (Podzial wolumenu na sciezki):\n";
+for {d in Demands} {
+    printf " Zapotrzebowanie d=%d (wolumen %d):\n", d, demand_volume[d];
+    for {p in Paths[d]} {
+        printf "   - Sciezka %d: %d\n", p, x[d,p];
+    }
+}
+
+quit;
