@@ -1,0 +1,8 @@
+reset;
+model dap_calkowite.mod;
+data dap2.txt;
+option solver "/home/student/Oast/Solvers/ampl.linux64/ampl.linux-intel64/cplex";
+solve;
+printf "\n=== WARIANT CALKOWITOLICZBOWY ===\n";
+printf "Czas obliczen solvera = %.3f s\n", _solve_time;
+quit;
