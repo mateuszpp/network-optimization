@@ -1,0 +1,15 @@
+reset;
+model ddap_lp.mod;
+data ddap2.txt;
+option solver "/home/student/Oast/Solvers/ampl.linux64/ampl.linux-intel64/cplex";
+solve;
+
+printf "\n=== WYNIKI DLA WARIANTU: LP (Ciagle Przeplywy i Moduly) ===\n";
+printf "Funkcja celu: %g\n\n", DDAP_obj;
+printf "%-6s | %-12s | %-12s | %-12s\n", "Link", "Obciazenie", "Pojemnosc", "Moduly(y)";
+for {l in Links} {
+    printf "%-6d | %-12.2f | %-12.2f | %-12.2f\n", l,
+        sum {d in Demands, p in Paths[d] : l in Demand_pathLinks[d,p]} x[d,p],
+        y[l] * moduleCapacity, y[l];
+}
+quit;
